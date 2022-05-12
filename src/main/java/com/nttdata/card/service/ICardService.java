@@ -17,6 +17,8 @@ public interface ICardService {
 
     Mono<Card> findById(String id);
 
+    Mono<Card> findByCci(String cci);
+
     Mono<Card> create(CardRequest request);
 
     Mono<Card> update(String id, CardRequest request);

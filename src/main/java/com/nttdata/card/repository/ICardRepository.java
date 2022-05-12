@@ -14,6 +14,6 @@ import reactor.core.publisher.Mono;
 @Repository
 public interface ICardRepository extends ReactiveMongoRepository<Card, String> {
 
-    //Mono<Card> findByName(String name);
+    Mono<Card> findByCci(String name);
 
 }

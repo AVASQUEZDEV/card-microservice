@@ -2,8 +2,10 @@ package com.nttdata.card.service.impl;
 
 import com.nttdata.card.dto.mapper.CardMapper;
 import com.nttdata.card.dto.request.CardRequest;
+import com.nttdata.card.dto.request.proxy.BankAccountRequest;
 import com.nttdata.card.exceptions.CustomException;
 import com.nttdata.card.model.Card;
+import com.nttdata.card.proxy.bankaccount.BankAccountProxy;
 import com.nttdata.card.repository.ICardRepository;
 import com.nttdata.card.service.ICardService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
 /**
  * This class defines the service of bank accounts charges
@@ -25,9 +31,11 @@ public class CardServiceImpl implements ICardService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CardServiceImpl.class);
 
-    private final ICardRepository ICardRepository;
+    private final ICardRepository cardRepository;
 
     private final CardMapper cardMapper;
+
+    private final BankAccountProxy bankAccountProxy;
 
     /**
      * This method returns a list of bank accounts charges
@@ -36,7 +44,7 @@ public class CardServiceImpl implements ICardService {
      */
     @Override
     public Flux<Card> findAll() {
-        return ICardRepository.findAll().onErrorResume(e -> {
+        return cardRepository.findAll().onErrorResume(e -> {
             LOGGER.error("[" + getClass().getName() + "][findAll]" + e);
             return Mono.error(CustomException.internalServerError("Internal Server Error:" + e));
         });
@@ -50,7 +58,20 @@ public class CardServiceImpl implements ICardService {
      */
     @Override
     public Mono<Card> findById(String id) {
-        return ICardRepository.findById(id)
+        return cardRepository.findById(id)
+                .onErrorResume(e -> {
+                    LOGGER.error("[" + getClass().getName() + "][findById]" + e.getMessage());
+                    return Mono.error(CustomException.badRequest("The request is invalid:" + e));
+                }).switchIfEmpty(Mono.error(CustomException.notFound("Bank account charge not found")));
+    }
+
+    /**
+     * @param cci request
+     * @return card
+     */
+    @Override
+    public Mono<Card> findByCci(String cci) {
+        return cardRepository.findByCci(cci)
                 .onErrorResume(e -> {
                     LOGGER.error("[" + getClass().getName() + "][findById]" + e.getMessage());
                     return Mono.error(CustomException.badRequest("The request is invalid:" + e));
@@ -66,7 +87,7 @@ public class CardServiceImpl implements ICardService {
     @Override
     public Mono<Card> create(CardRequest request) {
         return cardMapper.toPostModel(request)
-                .flatMap(ICardRepository::save)
+                .flatMap(cardRepository::save)
                 .onErrorResume(e -> {
                     LOGGER.error("[" + getClass().getName() + "][create]" + e);
                     return Mono.error(CustomException.badRequest("The request is invalid:" + e));
@@ -83,12 +104,23 @@ public class CardServiceImpl implements ICardService {
     @Override
     public Mono<Card> update(String id, CardRequest request) {
         return findById(id)
-                .flatMap(bac -> cardMapper.toPutModel(bac, request)
-                        .flatMap(ICardRepository::save))
+                .flatMap(c -> cardMapper.toPutModel(c, request)
+                        .flatMap(req -> {
+                            if (checkIfExistField(request, "bankAccountId")) {
+                                return bankAccountProxy.getBankAccountById(request.getBankAccountId())
+                                        .flatMap(ba -> bankAccountProxy.bankAccountUpdate(ba.getId(),
+                                                        new BankAccountRequest(c.getId()))
+                                                .flatMap(res -> cardRepository.save(req))
+                                        );
+                            }
+                            System.out.println("test:" + checkIfExistField(request, "bankAccountId"));
+                            return cardRepository.save(req);
+                        }))
                 .onErrorResume(e -> {
                     LOGGER.error("[" + getClass().getName() + "][update]" + e);
                     return Mono.error(CustomException.badRequest("The request is invalid:" + e));
-                }).switchIfEmpty(Mono.error(CustomException.notFound("Bank account charge not found")));
+                }).switchIfEmpty(Mono.error(CustomException.notFound("Card not found"))
+                );
     }
 
     /**
@@ -99,10 +131,19 @@ public class CardServiceImpl implements ICardService {
      */
     @Override
     public Mono<Void> deleteById(String id) {
-        return ICardRepository.deleteById(id).onErrorResume(e -> {
+        return cardRepository.deleteById(id).onErrorResume(e -> {
             LOGGER.error("[" + getClass().getName() + "][delete]" + e);
             return Mono.error(CustomException.badRequest("The request is invalid:" + e));
         });
+    }
+
+    private boolean checkIfExistField(CardRequest request, String fieldName) {
+        try {
+            Field f = request.getClass().getField(fieldName);
+            return true;
+        } catch (NoSuchFieldException e) {
+            return false;
+        }
     }
 
 }

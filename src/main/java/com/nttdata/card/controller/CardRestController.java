@@ -12,7 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * This controller class defines the endpoints to bank account charges
+ * This controller class defines the endpoints to cards
  *
  * @author Alcibar Vasquesz
  * @version 1.0
@@ -27,7 +27,7 @@ public class CardRestController {
     private final CardMapper cardMapper;
 
     /**
-     * @return list of bank account charges
+     * @return list of cards
      */
     @ResponseStatus(HttpStatus.OK)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
@@ -36,7 +36,7 @@ public class CardRestController {
     }
 
     /**
-     * @return bank account charge
+     * @return card
      */
     @ResponseStatus(HttpStatus.OK)
     @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -45,8 +45,17 @@ public class CardRestController {
     }
 
     /**
-     * @param request request to create bank account charge
-     * @return bank account charge created
+     * @return card
+     */
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping(value = "/cci/{cci}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<CardResponse> getByCci(@PathVariable(name = "cci") String cci) {
+        return cardMapper.toMonoResponse(cardService.findByCci(cci));
+    }
+
+    /**
+     * @param request request to create card
+     * @return card created
      */
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping(
@@ -57,9 +66,9 @@ public class CardRestController {
     }
 
     /**
-     * @param id      bank account charge id to update
-     * @param request request for update bank account charge
-     * @return bank account charge updated
+     * @param id      card id to update
+     * @param request request for update card
+     * @return card updated
      */
     @ResponseStatus(HttpStatus.CREATED)
     @PutMapping(
@@ -72,7 +81,7 @@ public class CardRestController {
     }
 
     /**
-     * @param id bank account charge id to delete
+     * @param id card id to delete
      * @return void
      */
     @ResponseStatus(HttpStatus.NO_CONTENT)

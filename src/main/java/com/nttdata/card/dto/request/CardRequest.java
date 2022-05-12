@@ -13,6 +13,8 @@ import java.util.Date;
 @Data
 public class CardRequest {
 
+    private String bankAccountId;
+
     private String cardNumber;
 
     private Long securityCode;
